@@ -1,0 +1,177 @@
+{
+  "id": "flood_mapping_001",
+  "name": "Flood Risk Mapping using Sentinel-1 SAR",
+  "description": "Detect inundated areas from Synthetic Aperture Radar (Sentinel-1) imagery combined with DEM analysis for flood extent estimation.",
+  "category": "hazard_assessment",
+  "tags": ["flood", "sar", "sentinel-1", "inundation", "water-detection"],
+  "author": "CortexGIS",
+  "version": "1.0",
+  "created": "2025-03-02",
+  "inputs": {
+    "aoi": {
+      "type": "geojson",
+      "description": "Area of Interest as a GeoJSON polygon or feature collection"
+    },
+    "date_range": {
+      "type": "array",
+      "description": "Start and end dates as ['YYYY-MM-DD', 'YYYY-MM-DD']",
+      "example": ["2024-08-01", "2024-08-31"]
+    },
+    "slope_threshold": {
+      "type": "number",
+      "description": "Maximum slope (degrees) to include in flood risk area",
+      "default": 2
+    }
+  },
+  "steps": [
+    {
+      "id": "fetch_sentinel1",
+      "description": "Download Sentinel-1 SAR imagery for the AOI",
+      "tool": "sentinel",
+      "op": "download_sar",
+      "params": {
+        "polarization": "VV",
+        "product_type": "GRD",
+        "months": [8, 9]
+      },
+      "outputs": ["sentinel1_vv.tif"],
+      "notes": "VV polarization is most sensitive to open water"
+    },
+    {
+      "id": "preprocess_sar",
+      "description": "Apply speckle filtering to reduce SAR noise",
+      "tool": "raster",
+      "op": "speckle_filter",
+      "params": {
+        "kernel_size": 5,
+        "filter_type": "lee"
+      },
+      "inputs": ["$fetch_sentinel1.outputs"],
+      "outputs": ["sentinel1_filtered.tif"]
+    },
+    {
+      "id": "convert_to_db",
+      "description": "Convert intensity to dB scale for better interpretability",
+      "tool": "raster",
+      "op": "to_db",
+      "params": {
+        "scale_factor": 10
+      },
+      "inputs": ["$preprocess_sar.outputs"],
+      "outputs": ["sentinel1_db.tif"]
+    },
+    {
+      "id": "threshold_water",
+      "description": "Threshold SAR imagery to isolate water surfaces (low backscatter)",
+      "tool": "raster",
+      "op": "threshold",
+      "params": {
+        "value": -17,
+        "comparison": "less_than"
+      },
+      "inputs": ["$convert_to_db.outputs"],
+      "outputs": ["flood_mask_sar.tif"],
+      "notes": "Threshold -17 dB typical for VV; may vary by incidence angle"
+    },
+    {
+      "id": "fetch_dem",
+      "description": "Retrieve Digital Elevation Model for terrain analysis",
+      "tool": "dem",
+      "op": "fetch_srtm",
+      "params": {
+        "resolution": 30
+      },
+      "outputs": ["dem.tif"]
+    },
+    {
+      "id": "compute_slope",
+      "description": "Derive slope raster from DEM",
+      "tool": "whitebox",
+      "op": "slope",
+      "params": {
+        "units": "degrees"
+      },
+      "inputs": ["$fetch_dem.outputs"],
+      "outputs": ["slope.tif"]
+    },
+    {
+      "id": "mask_steep_terrain",
+      "description": "Exclude areas with slope > threshold (unlikely to hold water)",
+      "tool": "raster",
+      "op": "mask",
+      "params": {
+        "mask_value": 2,
+        "comparison": "greater_than"
+      },
+      "inputs": ["$flood_mask_sar.outputs", "$compute_slope.outputs"],
+      "outputs": ["flood_mask_refined.tif"]
+    },
+    {
+      "id": "morphological_clean",
+      "description": "Remove noise and close gaps using morphological operations",
+      "tool": "raster",
+      "op": "morphological_close",
+      "params": {
+        "kernel_size": 3
+      },
+      "inputs": ["$mask_steep_terrain.outputs"],
+      "outputs": ["flood_mask_clean.tif"]
+    },
+    {
+      "id": "vectorize_flood",
+      "description": "Convert raster flood mask to vector polygons",
+      "tool": "vector",
+      "op": "raster_to_vector",
+      "params": {
+        "band": 1,
+        "simplify": true,
+        "simplify_tolerance": 10
+      },
+      "inputs": ["$morphological_clean.outputs"],
+      "outputs": ["flood_extent.geojson"]
+    },
+    {
+      "id": "compute_statistics",
+      "description": "Calculate flood extent statistics (area, count of affected pixels)",
+      "tool": "raster",
+      "op": "stats",
+      "params": {},
+      "inputs": ["$morphological_clean.outputs"],
+      "outputs": ["flood_stats.json"]
+    }
+  ],
+  "outputs": {
+    "flood_raster": "flood_mask_clean.tif",
+    "flood_vector": "flood_extent.geojson",
+    "statistics": "flood_stats.json"
+  },
+  "cot_reasoning": [
+    "1. User wants to map flood-affected areas in a region.",
+    "2. Sentinel-1 SAR is excellent for this because it penetrates clouds and detects water via low backscatter.",
+    "3. Download VV-polarized Sentinel-1 data for August-September (monsoon peak).",
+    "4. Preprocess: apply speckle filter to reduce SAR noise (inherent to radar data).",
+    "5. Convert to dB scale for easier interpretation and thresholding.",
+    "6. Threshold at -17 dB to isolate water bodies (open water has very low backscatter).",
+    "7. Fetch DEM to compute slope; exclude steep terrain (slope >2°) as water is unlikely there.",
+    "8. Apply morphological closing to remove noise, fill small gaps.",
+    "9. Vectorize result to generate polygon boundaries of flooded areas.",
+    "10. Compute area statistics for reporting and impact assessment."
+  ],
+  "confidence": 0.85,
+  "validation_metrics": {
+    "expected_output_type": "raster + vector",
+    "typical_accuracy": "80-90% (vs. optical validation)",
+    "computation_time_minutes": 20
+  },
+  "caveats": [
+    "Threshold (-17 dB) is typical but may need adjustment based on local incidence angle.",
+    "Requires cloud-free optical validation data for ground truth comparison.",
+    "May misclassify calm water bodies (low-backscatter) and some urban areas.",
+    "SAR layover and shadow effects in mountainous terrain can affect results."
+  ],
+  "references": [
+    "Sentinel-1 User Handbook (ESA)",
+    "Townsend & Walsh (2001) - SAR flood detection",
+    "COPERNICUS Emergency Response"
+  ]
+}

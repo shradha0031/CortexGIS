@@ -1,0 +1,6 @@
+workflow_id,test_case,execution_time_s,success_rate_pct,iou,f1_score
+flood_mapping_001,small_aoi,1650,100.0,0.9099999999999999,0.87
+flood_mapping_001,medium_aoi,1700,100.0,0.9199999999999999,0.87
+flood_mapping_001,large_aoi,1650,100.0,0.9099999999999999,0.87
+site_suitability_solar_001,flat_terrain,1980,100.0,,
+site_suitability_solar_001,mountainous,1940,100.0,,

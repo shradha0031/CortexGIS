@@ -1,0 +1,225 @@
+{
+  "id": "site_suitability_solar_001",
+  "name": "Site Suitability Analysis for Solar Farms",
+  "description": "Identify suitable locations for solar farm development by excluding unsuitable zones (water, forest, steep terrain, urban) and prioritizing accessible areas with good solar potential.",
+  "category": "planning",
+  "tags": ["solar", "suitability", "renewable-energy", "site-selection", "planning"],
+  "author": "CortexGIS",
+  "version": "1.0",
+  "created": "2025-03-02",
+  "inputs": {
+    "aoi": {
+      "type": "geojson",
+      "description": "Area of Interest as a polygon"
+    },
+    "constraints": {
+      "type": "object",
+      "description": "Suitability criteria",
+      "example": {
+        "max_slope_degrees": 5,
+        "min_distance_to_roads_km": 1,
+        "max_distance_to_roads_km": 5,
+        "exclude_landcover_classes": ["water", "forest", "urban", "wetland"]
+      }
+    }
+  },
+  "steps": [
+    {
+      "id": "fetch_landcover",
+      "description": "Retrieve land cover classification (Sentinel-2 based)",
+      "tool": "landcover",
+      "op": "fetch_sentinel_lulc",
+      "params": {
+        "classification_scheme": "EN-CORINE"
+      },
+      "outputs": ["landcover.tif"]
+    },
+    {
+      "id": "fetch_dem",
+      "description": "Get Digital Elevation Model for slope analysis",
+      "tool": "dem",
+      "op": "fetch_srtm",
+      "params": {
+        "resolution": 30
+      },
+      "outputs": ["dem.tif"]
+    },
+    {
+      "id": "fetch_roads",
+      "description": "Download road network from OpenStreetMap",
+      "tool": "osm",
+      "op": "fetch_roads",
+      "params": {
+        "highway_types": ["primary", "secondary", "tertiary"]
+      },
+      "outputs": ["roads.geojson"]
+    },
+    {
+      "id": "compute_slope",
+      "description": "Compute slope from DEM",
+      "tool": "whitebox",
+      "op": "slope",
+      "params": {
+        "units": "degrees"
+      },
+      "inputs": ["$fetch_dem.outputs"],
+      "outputs": ["slope_degrees.tif"]
+    },
+    {
+      "id": "mask_landcover",
+      "description": "Exclude unsuitable land cover types",
+      "tool": "raster",
+      "op": "mask_values",
+      "params": {
+        "exclude_classes": [42, 50, 60, 90],
+        "class_names": ["water", "urban", "forest", "wetland"]
+      },
+      "inputs": ["$fetch_landcover.outputs"],
+      "outputs": ["landcover_suitable.tif"]
+    },
+    {
+      "id": "mask_slope",
+      "description": "Exclude areas with slope > 5 degrees",
+      "tool": "raster",
+      "op": "threshold",
+      "params": {
+        "value": 5,
+        "comparison": "less_than_equal"
+      },
+      "inputs": ["$compute_slope.outputs"],
+      "outputs": ["slope_suitable.tif"]
+    },
+    {
+      "id": "compute_road_distance",
+      "description": "Compute Euclidean distance to nearest road",
+      "tool": "whitebox",
+      "op": "euclidean_distance",
+      "params": {
+        "input_type": "vector"
+      },
+      "inputs": ["$fetch_roads.outputs"],
+      "outputs": ["distance_to_roads.tif"]
+    },
+    {
+      "id": "mask_road_distance",
+      "description": "Keep areas within 5 km of roads (accessibility constraint)",
+      "tool": "raster",
+      "op": "threshold",
+      "params": {
+        "min_value": 1000,
+        "max_value": 5000,
+        "units": "meters"
+      },
+      "inputs": ["$compute_road_distance.outputs"],
+      "outputs": ["distance_suitable.tif"]
+    },
+    {
+      "id": "combine_constraints",
+      "description": "Overlay all constraint masks to get candidate areas",
+      "tool": "raster",
+      "op": "overlay",
+      "params": {
+        "operation": "AND"
+      },
+      "inputs": ["$landcover_suitable.outputs", "$slope_suitable.outputs", "$distance_suitable.outputs"],
+      "outputs": ["candidate_sites.tif"]
+    },
+    {
+      "id": "fetch_solar_irradiance",
+      "description": "Get annual solar irradiance map",
+      "tool": "climate",
+      "op": "fetch_solar_irradiance",
+      "params": {
+        "dataset": "MERRA2"
+      },
+      "outputs": ["solar_irradiance.tif"]
+    },
+    {
+      "id": "rank_by_solar",
+      "description": "Rank suitable cells by solar potential (irradiance)",
+      "tool": "raster",
+      "op": "rank",
+      "params": {
+        "by_values": true,
+        "ascending": false
+      },
+      "inputs": ["$candidate_sites.outputs", "$fetch_solar_irradiance.outputs"],
+      "outputs": ["suitability_ranked.tif"]
+    },
+    {
+      "id": "identify_clusters",
+      "description": "Find contiguous clusters of suitable land (>10 ha minimum)",
+      "tool": "raster",
+      "op": "connected_components",
+      "params": {
+        "min_size_hectares": 10,
+        "connectivity": 8
+      },
+      "inputs": ["$suitability_ranked.outputs"],
+      "outputs": ["site_clusters.tif"]
+    },
+    {
+      "id": "vectorize_sites",
+      "description": "Convert raster clusters to vector polygons",
+      "tool": "vector",
+      "op": "raster_to_vector",
+      "params": {
+        "band": 1,
+        "simplify": true,
+        "simplify_tolerance": 20
+      },
+      "inputs": ["$site_clusters.outputs"],
+      "outputs": ["candidate_sites.geojson"]
+    },
+    {
+      "id": "compute_site_attributes",
+      "description": "Calculate statistics for each site (area, mean elevation, mean slope, mean solar potential)",
+      "tool": "vector",
+      "op": "zonal_statistics",
+      "params": {},
+      "inputs": ["$candidate_sites.geojson", "$fetch_dem.outputs", "$fetch_solar_irradiance.outputs"],
+      "outputs": ["site_attributes.geojson", "site_summary.csv"]
+    }
+  ],
+  "outputs": {
+    "suitability_map": "suitability_ranked.tif",
+    "candidate_sites_raster": "site_clusters.tif",
+    "candidate_sites_vector": "candidate_sites.geojson",
+    "site_summary_table": "site_summary.csv"
+  },
+  "cot_reasoning": [
+    "1. User wants to identify suitable areas for solar farm development.",
+    "2. Define constraints: exclude water/forest/urban/wetlands; keep slope <5°; access roads.",
+    "3. Fetch landcover map to identify unsuitable zones (water, forest, urban).",
+    "4. Fetch DEM and compute slope; exclude areas >5° (difficult to construct, higher costs).",
+    "5. Download OSM roads to measure accessibility; buffer 1-5 km (balances cost and connection).",
+    "6. Fetch solar irradiance data (MERRA-2 or similar) to rank suitable sites.",
+    "7. Combine all constraint layers using logical AND: only areas passing ALL criteria.",
+    "8. Rank resulting areas by solar irradiance to prioritize high-potential sites.",
+    "9. Identify contiguous clusters (>10 hectares minimum viable farm size).",
+    "10. Vectorize clusters and compute final attributes (area, elevation, solar, distance-to-roads).",
+    "11. Generate list of ranked candidate sites for stakeholder review."
+  ],
+  "confidence": 0.80,
+  "validation_metrics": {
+    "expected_output_type": "raster map + vector polygons + summary table",
+    "typical_number_of_candidates": "5-20 per 100 sq km",
+    "computation_time_minutes": 25
+  },
+  "caveats": [
+    "Results are based on average environmental data; local factors (soil quality, environmental permits, land ownership) not included.",
+    "Solar irradiance data is modeled; actual production depends on weather, panel orientation, system design.",
+    "Road distance threshold (1-5 km) is arbitrary; adjust based on grid capacity and transmission costs.",
+    "Cluster minimum size (10 ha) assumes medium-scale farms; adjust for different project scales."
+  ],
+  "next_steps": [
+    "Ground-truth validation on selected candidate sites",
+    "Environmental and social impact assessment (ESIA)",
+    "Land ownership and legal feasibility check",
+    "Engineering feasibility study (geotechnical survey)"
+  ],
+  "references": [
+    "IRENA - Renewable Energy Resource Mapping",
+    "Charabi & Gastli (2011) - GIS for Solar Site Selection"
+  ]
+}

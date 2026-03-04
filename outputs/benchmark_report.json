@@ -1,0 +1,91 @@
+{
+  "metadata": {
+    "generated_at": "2026-03-02 04:28:04",
+    "num_benchmarks": 5
+  },
+  "results": [
+    {
+      "workflow_id": "flood_mapping_001",
+      "test_case": "small_aoi",
+      "execution_time_seconds": 1650,
+      "memory_peak_mb": 2048.0,
+      "successful_steps": 10,
+      "total_steps": 10,
+      "success_rate_percent": 100.0,
+      "accuracy_metrics": {
+        "iou": 0.9099999999999999,
+        "f1_score": 0.87,
+        "precision": 0.89,
+        "recall": 0.85
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "flood_mapping_001",
+      "test_case": "medium_aoi",
+      "execution_time_seconds": 1700,
+      "memory_peak_mb": 2048.0,
+      "successful_steps": 10,
+      "total_steps": 10,
+      "success_rate_percent": 100.0,
+      "accuracy_metrics": {
+        "iou": 0.9199999999999999,
+        "f1_score": 0.87,
+        "precision": 0.89,
+        "recall": 0.85
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "flood_mapping_001",
+      "test_case": "large_aoi",
+      "execution_time_seconds": 1650,
+      "memory_peak_mb": 2048.0,
+      "successful_steps": 10,
+      "total_steps": 10,
+      "success_rate_percent": 100.0,
+      "accuracy_metrics": {
+        "iou": 0.9099999999999999,
+        "f1_score": 0.87,
+        "precision": 0.89,
+        "recall": 0.85
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "site_suitability_solar_001",
+      "test_case": "flat_terrain",
+      "execution_time_seconds": 1980,
+      "memory_peak_mb": 2200.0,
+      "successful_steps": 14,
+      "total_steps": 14,
+      "success_rate_percent": 100.0,
+      "accuracy_metrics": {
+        "area_correlation": 0.91,
+        "site_identification_rate": 0.88,
+        "false_positive_rate": 0.06
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "site_suitability_solar_001",
+      "test_case": "mountainous",
+      "execution_time_seconds": 1940,
+      "memory_peak_mb": 2200.0,
+      "successful_steps": 14,
+      "total_steps": 14,
+      "success_rate_percent": 100.0,
+      "accuracy_metrics": {
+        "area_correlation": 0.91,
+        "site_identification_rate": 0.88,
+        "false_positive_rate": 0.06
+      },
+      "error": null
+    }
+  ],
+  "summary": {
+    "avg_execution_time_seconds": 1784.0,
+    "avg_success_rate_percent": 100.0,
+    "total_memory_mb": 10544.0
+  }
+}

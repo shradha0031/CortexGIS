@@ -1,0 +1,47 @@
+# CortexGIS: Full Stack with Geospatial Processing
+# Install ALL dependencies for complete functionality (RAG, vector/raster processing, benchmarking)
+# 
+# Windows users: Some packages may require pre-installed GDAL dev libraries
+# macOS users:  May require Xcode command-line tools
+# Linux users:  May require gdal-dev, libgdal-dev packages
+
+# === Core UI & Planning ===
+streamlit>=1.28.0
+pydantic>=2.0.0
+
+# === Vector Data Processing ===
+# GeoPandas enables: buffer, dissolve, intersect, union, simplify operations
+geopandas>=0.13.0
+shapely>=2.0.0
+
+# === Raster Data Processing ===
+# Rasterio enables: threshold, resampling, reprojection, masking of satellite imagery
+rasterio>=1.3.0
+numpy>=1.24.0
+scipy>=1.10.0
+scikit-image>=0.20.0
+
+# === Advanced Geospatial Algorithms ===
+# Whitebox enables: flow accumulation, slope, aspect, hydrology, terrain analysis
+whitebox>=1.0.0
+
+# === Retrieval-Augmented Generation (RAG) ===
+# Sentence-Transformers for semantic document embedding
+sentence-transformers>=2.2.0
+# FAISS for efficient vector similarity search (use faiss-gpu if CUDA available)
+faiss-cpu>=1.7.0
+
+# === Data Utils ===
+pandas>=2.0.0
+matplotlib>=3.7.0
+tqdm>=4.65.0
+
+# === Benchmarking & Evaluation ===
+# Already included in evaluation/benchmark.py, no additional deps needed
+
+# === Development & Testing (Optional) ===
+# Uncomment for development/debugging
+# pytest>=7.0.0
+# black>=23.0.0
+# pylint>=2.17.0
+# mypy>=1.0.0
