@@ -1,6 +1,8 @@
-# CortexGIS: Chain-of-Thought LLM System for Geospatial Workflow Orchestration
+# CortexGIS: Chain-of-Thought Reasoning for Autonomous Geospatial Workflows
 
-A production-ready reference implementation demonstrating **LLM-driven planning, Chain-of-Thought reasoning, retrieval-augmented generation (RAG), and intelligent tool orchestration** for complex spatial analysis tasks.
+![CortexGIS](https://img.shields.io/badge/status-beta-yellow) ![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue) ![License: MIT](https://img.shields.io/badge/license-MIT-green)
+
+**Automatically generate, reason about, and execute complex geospatial workflows from natural language queries using LLM-powered Chain-of-Thought reasoning.**
 
 **Built as a comprehensive solution to:** *"Build a chain-of-thought-based LLM system for solving complex spatial analysis tasks through intelligent geoprocessing orchestration."*
 
