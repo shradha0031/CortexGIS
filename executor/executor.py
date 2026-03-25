@@ -1,7 +1,7 @@
 """Tool registry and workflow executor."""
 from typing import Dict, List, Any, Optional
 from executor.tool_base import GeoTool, ToolResult, ToolStatus
-from executor.tool_adapters import VectorTool, RasterTool, WhiteboxTool
+from executor.tool_adapters import VectorTool, RasterTool, WhiteboxTool, SentinelTool
 import json
 
 
@@ -17,6 +17,7 @@ class ToolRegistry:
         self.register("vector", VectorTool())
         self.register("raster", RasterTool())
         self.register("whitebox", WhiteboxTool())
+        self.register("sentinel", SentinelTool())
     
     def register(self, name: str, tool: GeoTool):
         """Register a tool."""
@@ -52,6 +53,11 @@ class WorkflowExecutor:
         """
         workflow_id = workflow.get("id", "unknown_workflow")
         steps = workflow.get("steps", [])
+
+        # Reset execution state for each run so old step logs/results do not leak
+        # into the current workflow execution summary.
+        self.execution_log = []
+        self.step_outputs = {}
         
         print(f"\n[Executor] Starting workflow: {workflow_id}")
         successful_steps = 0

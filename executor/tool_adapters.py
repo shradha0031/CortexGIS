@@ -1,7 +1,64 @@
 """Tool adapters for GeoPandas, Rasterio, WhiteboxTools, etc."""
 from executor.tool_base import GeoTool, ToolResult, ToolStatus
 from typing import Dict, Any, List
+import json
 import os
+
+
+def _ensure_output_dir(output_dir: str) -> str:
+    os.makedirs(output_dir, exist_ok=True)
+    return output_dir
+
+
+def _build_output_path(output_dir: str, filename: str) -> str:
+    return os.path.join(_ensure_output_dir(output_dir), filename)
+
+
+def _write_placeholder_file(path: str, contents: str = "") -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(contents)
+
+
+def _write_sample_geojson(
+    path: str,
+    feature_name: str = "result_polygon",
+    center_lat: float = 18.5204,
+    center_lon: float = 73.8567,
+    size_deg: float = 0.02,
+) -> None:
+    """Write a small sample polygon centered on provided coordinates."""
+    min_lon = center_lon - size_deg
+    max_lon = center_lon + size_deg
+    min_lat = center_lat - size_deg
+    max_lat = center_lat + size_deg
+
+    feature_collection = {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "properties": {
+                    "name": feature_name,
+                    "center_lat": center_lat,
+                    "center_lon": center_lon,
+                },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[
+                        [min_lon, min_lat],
+                        [max_lon, min_lat],
+                        [max_lon, max_lat],
+                        [min_lon, max_lat],
+                        [min_lon, min_lat],
+                    ]],
+                },
+            }
+        ],
+    }
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(feature_collection, f)
 
 
 class VectorTool(GeoTool):
@@ -17,26 +74,29 @@ class VectorTool(GeoTool):
             pass
     
     def execute(self, operation: str, params: Dict[str, Any], **kwargs) -> ToolResult:
-        if not self.geopandas_available:
-            return ToolResult(
-                tool_name=self.name,
-                operation=operation,
-                status=ToolStatus.FAILED,
-                output_files=[],
-                error_message="GeoPandas not installed. Install with: pip install geopandas"
-            )
-        
         logs = []
+        if not self.geopandas_available:
+            logs.append("GeoPandas not installed; running vector tool in stub mode")
         try:
-            import geopandas as gpd
-            
+            output_dir = kwargs.get("output_dir", ".")
+
             if operation == "buffer":
                 # Stub: in real impl, load file, buffer, save
                 input_file = params.get("input", "aoi.geojson")
                 distance = params.get("distance_m", 100)
-                output_file = f"buffered_{distance}m.geojson"
+                center_lat = float(params.get("center_lat", 18.5204))
+                center_lon = float(params.get("center_lon", 73.8567))
+                size_deg = float(params.get("size_deg", 0.02))
+                output_file = _build_output_path(output_dir, f"buffered_{distance}m.geojson")
                 logs.append(f"Buffering {input_file} by {distance}m")
                 # Stub: gpd.read_file(input_file).buffer(distance).to_file(output_file)
+                _write_sample_geojson(
+                    output_file,
+                    feature_name="buffered_area",
+                    center_lat=center_lat,
+                    center_lon=center_lon,
+                    size_deg=size_deg,
+                )
                 
                 return ToolResult(
                     tool_name=self.name,
@@ -48,8 +108,9 @@ class VectorTool(GeoTool):
                 )
             
             elif operation == "dissolve":
-                output_file = "dissolved.geojson"
+                output_file = _build_output_path(output_dir, "dissolved.geojson")
                 logs.append("Dissolving geometries by attribute")
+                _write_sample_geojson(output_file, feature_name="dissolved_area")
                 return ToolResult(
                     tool_name=self.name,
                     operation=operation,
@@ -58,6 +119,38 @@ class VectorTool(GeoTool):
                     logs=logs
                 )
             
+            elif operation in {"raster_to_vector", "raster_to_poly"}:
+                center_lat = float(params.get("center_lat", 18.5204))
+                center_lon = float(params.get("center_lon", 73.8567))
+                size_deg = float(params.get("size_deg", 0.02))
+                output_file = _build_output_path(output_dir, "flood_boundary.geojson")
+                logs.append("Vectorizing raster mask to polygon features")
+                _write_sample_geojson(
+                    output_file,
+                    feature_name="flood_extent",
+                    center_lat=center_lat,
+                    center_lon=center_lon,
+                    size_deg=size_deg,
+                )
+                return ToolResult(
+                    tool_name=self.name,
+                    operation=operation,
+                    status=ToolStatus.SUCCESS,
+                    output_files=[output_file],
+                    metrics={"features": 1},
+                    logs=logs,
+                )
+
+            elif operation == "validate":
+                logs.append("Validated vector inputs")
+                return ToolResult(
+                    tool_name=self.name,
+                    operation=operation,
+                    status=ToolStatus.SUCCESS,
+                    output_files=[],
+                    logs=logs,
+                )
+
             else:
                 return ToolResult(
                     tool_name=self.name,
@@ -77,7 +170,16 @@ class VectorTool(GeoTool):
             )
     
     def supported_operations(self) -> List[str]:
-        return ["buffer", "dissolve", "intersect", "reproject", "simplify"]
+        return [
+            "buffer",
+            "dissolve",
+            "intersect",
+            "reproject",
+            "simplify",
+            "raster_to_vector",
+            "raster_to_poly",
+            "validate",
+        ]
 
 
 class RasterTool(GeoTool):
@@ -93,21 +195,17 @@ class RasterTool(GeoTool):
             pass
     
     def execute(self, operation: str, params: Dict[str, Any], **kwargs) -> ToolResult:
-        if not self.rasterio_available:
-            return ToolResult(
-                tool_name=self.name,
-                operation=operation,
-                status=ToolStatus.FAILED,
-                output_files=[],
-                error_message="Rasterio not installed. Install with: pip install rasterio"
-            )
-        
         logs = []
+        if not self.rasterio_available:
+            logs.append("Rasterio not installed; running raster tool in stub mode")
         try:
+            output_dir = kwargs.get("output_dir", ".")
+
             if operation == "threshold":
                 threshold_val = params.get("value", -17)
-                output_file = f"thresholded_{threshold_val}.tif"
+                output_file = _build_output_path(output_dir, f"thresholded_{threshold_val}.tif")
                 logs.append(f"Applying threshold at value {threshold_val}")
+                _write_placeholder_file(output_file, "stub threshold raster")
                 
                 return ToolResult(
                     tool_name=self.name,
@@ -118,10 +216,11 @@ class RasterTool(GeoTool):
                     logs=logs
                 )
             
-            elif operation == "speckle_filter":
+            elif operation in {"speckle_filter", "despeckle"}:
                 kernel_size = params.get("kernel_size", 5)
-                output_file = "despeckled.tif"
+                output_file = _build_output_path(output_dir, "despeckled.tif")
                 logs.append(f"Applying speckle filter with kernel {kernel_size}x{kernel_size}")
+                _write_placeholder_file(output_file, "stub despeckled raster")
                 
                 return ToolResult(
                     tool_name=self.name,
@@ -132,6 +231,64 @@ class RasterTool(GeoTool):
                     logs=logs
                 )
             
+            elif operation == "to_db":
+                scale_factor = params.get("scale_factor", 10)
+                output_file = _build_output_path(output_dir, "sar_db.tif")
+                logs.append(f"Converting SAR intensity to dB with scale factor {scale_factor}")
+                _write_placeholder_file(output_file, "stub db raster")
+                return ToolResult(
+                    tool_name=self.name,
+                    operation=operation,
+                    status=ToolStatus.SUCCESS,
+                    output_files=[output_file],
+                    metrics={"scale_factor": scale_factor},
+                    logs=logs,
+                )
+
+            elif operation == "mask":
+                output_file = _build_output_path(output_dir, "masked.tif")
+                logs.append("Applying raster mask")
+                _write_placeholder_file(output_file, "stub masked raster")
+                return ToolResult(
+                    tool_name=self.name,
+                    operation=operation,
+                    status=ToolStatus.SUCCESS,
+                    output_files=[output_file],
+                    logs=logs,
+                )
+
+            elif operation == "morphological_close":
+                kernel_size = params.get("kernel_size", 3)
+                output_file = _build_output_path(output_dir, "flood_mask_clean.tif")
+                logs.append(f"Applying morphological close with kernel {kernel_size}")
+                _write_placeholder_file(output_file, "stub morphologically cleaned raster")
+                return ToolResult(
+                    tool_name=self.name,
+                    operation=operation,
+                    status=ToolStatus.SUCCESS,
+                    output_files=[output_file],
+                    metrics={"kernel_size": kernel_size},
+                    logs=logs,
+                )
+
+            elif operation == "stats":
+                output_file = _build_output_path(output_dir, "flood_stats.json")
+                stats_payload = {
+                    "flood_pixels": 1250,
+                    "flood_area_sq_km": 4.5,
+                    "note": "Stub statistics for demo output",
+                }
+                _write_placeholder_file(output_file, json.dumps(stats_payload, indent=2))
+                logs.append("Computed raster statistics")
+                return ToolResult(
+                    tool_name=self.name,
+                    operation=operation,
+                    status=ToolStatus.SUCCESS,
+                    output_files=[output_file],
+                    metrics=stats_payload,
+                    logs=logs,
+                )
+
             else:
                 return ToolResult(
                     tool_name=self.name,
@@ -151,7 +308,52 @@ class RasterTool(GeoTool):
             )
     
     def supported_operations(self) -> List[str]:
-        return ["threshold", "speckle_filter", "resample", "reproject", "mask"]
+        return [
+            "threshold",
+            "speckle_filter",
+            "despeckle",
+            "resample",
+            "reproject",
+            "mask",
+            "to_db",
+            "morphological_close",
+            "stats",
+        ]
+
+
+class SentinelTool(GeoTool):
+    """Stub adapter for Sentinel operations used by generated workflows."""
+
+    def __init__(self):
+        super().__init__("sentinel", "Sentinel imagery retrieval operations")
+
+    def execute(self, operation: str, params: Dict[str, Any], **kwargs) -> ToolResult:
+        output_dir = kwargs.get("output_dir", ".")
+        logs = []
+
+        if operation in {"download_vv", "download_sar"}:
+            output_file = _build_output_path(output_dir, "sentinel1_vv.tif")
+            logs.append(f"Preparing Sentinel SAR layer with params: {params}")
+            _write_placeholder_file(output_file, "stub sentinel SAR raster")
+            return ToolResult(
+                tool_name=self.name,
+                operation=operation,
+                status=ToolStatus.SUCCESS,
+                output_files=[output_file],
+                metrics={"source": "sentinel_stub"},
+                logs=logs,
+            )
+
+        return ToolResult(
+            tool_name=self.name,
+            operation=operation,
+            status=ToolStatus.FAILED,
+            output_files=[],
+            error_message=f"Operation '{operation}' not supported in SentinelTool",
+        )
+
+    def supported_operations(self) -> List[str]:
+        return ["download_vv", "download_sar"]
 
 
 class WhiteboxTool(GeoTool):

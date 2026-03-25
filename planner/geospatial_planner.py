@@ -1,6 +1,7 @@
 """LLM-based planner that generates workflows from natural language queries."""
 import json
 import re
+import hashlib
 from typing import Dict, List, Optional, Tuple
 
 
@@ -104,6 +105,8 @@ Now, reason through this problem step-by-step:
 
     def _stub_workflow(self, query: str) -> Dict:
         """Placeholder workflow generation for demonstration."""
+        center_lat, center_lon = self._infer_query_center(query)
+
         if "flood" in query.lower():
             return {
                 "id": "flood_plan_001",
@@ -114,7 +117,12 @@ Now, reason through this problem step-by-step:
                         "id": "fetch_s1",
                         "tool": "sentinel",
                         "op": "download_vv",
-                        "params": {"polarization": "VV", "months": [8, 9]}
+                        "params": {
+                            "polarization": "VV",
+                            "months": [8, 9],
+                            "center_lat": center_lat,
+                            "center_lon": center_lon,
+                        }
                     },
                     {
                         "id": "speckle_filter",
@@ -132,7 +140,11 @@ Now, reason through this problem step-by-step:
                         "id": "vectorize",
                         "tool": "vector",
                         "op": "raster_to_poly",
-                        "params": {}
+                        "params": {
+                            "center_lat": center_lat,
+                            "center_lon": center_lon,
+                            "size_deg": 0.03,
+                        }
                     }
                 ],
                 "outputs": ["flood_mask.tif", "flood_boundary.geojson"],
@@ -147,13 +159,46 @@ Now, reason through this problem step-by-step:
                     {
                         "id": "step1",
                         "tool": "vector",
-                        "op": "validate",
-                        "params": {}
+                        "op": "buffer",
+                        "params": {
+                            "input": "aoi.geojson",
+                            "distance_m": 250,
+                            "center_lat": center_lat,
+                            "center_lon": center_lon,
+                            "size_deg": 0.02,
+                        }
                     }
                 ],
-                "outputs": ["result.geojson"],
-                "cot": ["Validate inputs", "Plan analysis"]
+                "outputs": ["buffered_250m.geojson"],
+                "cot": ["Interpret query intent", "Create a map-ready vector result"]
             }
+
+    def _infer_query_center(self, query: str) -> Tuple[float, float]:
+        """Infer map center from known city mentions, else derive deterministic offset from query."""
+        q = query.lower()
+        known_centers = {
+            "pune": (18.5204, 73.8567),
+            "mumbai": (19.0760, 72.8777),
+            "delhi": (28.6139, 77.2090),
+            "bangalore": (12.9716, 77.5946),
+            "bengaluru": (12.9716, 77.5946),
+            "hyderabad": (17.3850, 78.4867),
+            "chennai": (13.0827, 80.2707),
+            "kolkata": (22.5726, 88.3639),
+            "india": (22.9734, 78.6569),
+        }
+        for place, coords in known_centers.items():
+            if place in q:
+                return coords
+
+        # Deterministic offset so different queries render different map outputs.
+        digest = hashlib.md5(query.encode("utf-8")).hexdigest()
+        lat_n = int(digest[:8], 16) / 0xFFFFFFFF
+        lon_n = int(digest[8:16], 16) / 0xFFFFFFFF
+        base_lat, base_lon = 18.5204, 73.8567
+        lat_offset = (lat_n - 0.5) * 0.8
+        lon_offset = (lon_n - 0.5) * 0.8
+        return base_lat + lat_offset, base_lon + lon_offset
 
     def validate_workflow(self, workflow: Dict) -> Tuple[bool, List[str]]:
         """Validate workflow against schema and tool registry."""

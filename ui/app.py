@@ -3,11 +3,80 @@ import streamlit as st
 import json
 import sys
 import os
+from pathlib import Path
+import pydeck as pdk
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from planner.geospatial_planner import GeospatialPlanner
 from executor.executor import WorkflowExecutor, ToolRegistry
+
+
+def _extract_geojson_outputs(result: dict) -> list[str]:
+    """Collect existing GeoJSON output files from execution logs."""
+    output_paths = []
+    for entry in result.get("execution_log", []):
+        for output_file in entry.get("result", {}).get("output_files", []):
+            if isinstance(output_file, str) and output_file.lower().endswith((".geojson", ".json")):
+                candidate = Path(output_file)
+                if candidate.exists():
+                    output_paths.append(str(candidate))
+    # Preserve order while removing duplicates.
+    return list(dict.fromkeys(output_paths))
+
+
+def _render_geojson_map(file_path: str):
+    """Render a GeoJSON file on an interactive map."""
+    with open(file_path, "r", encoding="utf-8") as f:
+        geojson_data = json.load(f)
+
+    features = geojson_data.get("features", []) if isinstance(geojson_data, dict) else []
+    if not features:
+        st.warning(f"No features to display in map file: {file_path}")
+        return
+
+    # Compute a simple map center from the first coordinate in first feature.
+    center_lat = 18.52
+    center_lon = 73.84
+    try:
+        geometry = features[0].get("geometry", {})
+        geom_type = geometry.get("type")
+        coords = geometry.get("coordinates", [])
+        if geom_type == "Point":
+            center_lon, center_lat = coords
+        elif geom_type == "Polygon":
+            center_lon, center_lat = coords[0][0]
+        elif geom_type == "MultiPolygon":
+            center_lon, center_lat = coords[0][0][0]
+    except Exception:
+        pass
+
+    layer = pdk.Layer(
+        "GeoJsonLayer",
+        geojson_data,
+        pickable=True,
+        stroked=True,
+        filled=True,
+        get_fill_color=[0, 120, 255, 90],
+        get_line_color=[0, 180, 255, 220],
+        line_width_min_pixels=2,
+    )
+
+    view_state = pdk.ViewState(latitude=center_lat, longitude=center_lon, zoom=10)
+    deck = pdk.Deck(layers=[layer], initial_view_state=view_state, tooltip={"text": "{name}"})
+    st.pydeck_chart(deck, use_container_width=True)
+
+
+def _render_default_map():
+    """Always provide a map canvas even when no vector artifact exists yet."""
+    st.caption("Default map view (no GeoJSON layer generated for this run).")
+    st.map(
+        [
+            {"lat": 18.5204, "lon": 73.8567},
+        ],
+        zoom=9,
+        use_container_width=True,
+    )
 
 
 # Page config
@@ -72,6 +141,8 @@ with tab1:
         with st.spinner("Reasoning... 💭"):
             cot, workflow = st.session_state.planner.plan_workflow(user_query)
             st.session_state.workflow = workflow
+            # Clear prior run results whenever a new workflow is generated.
+            st.session_state.execution_result = None
         
         # Display CoT reasoning
         st.subheader("Chain-of-Thought Reasoning")
@@ -137,6 +208,8 @@ with tab3:
             execute_button = st.button("▶️ Execute", type="primary")
         
         if execute_button:
+            # Rebuild executor per run to avoid stale registry or cached state.
+            st.session_state.executor = WorkflowExecutor(ToolRegistry())
             with st.spinner("Executing workflow... ⏳"):
                 result = st.session_state.executor.execute_workflow(
                     st.session_state.workflow,
@@ -153,6 +226,22 @@ with tab4:
     
     if st.session_state.execution_result:
         result = st.session_state.execution_result
+
+        # Show a compact failure summary first so execution issues are visible at a glance.
+        failed_entries = [
+            entry for entry in result.get("execution_log", [])
+            if entry.get("result", {}).get("status") != "success"
+        ]
+        if failed_entries:
+            st.error(f"{len(failed_entries)} step(s) failed. See quick summary below.")
+            for entry in failed_entries:
+                step_result = entry.get("result", {})
+                st.write(
+                    f"- `{entry.get('step_id', 'unknown')}`: "
+                    f"`{entry.get('tool', 'unknown')}.{entry.get('operation', 'unknown')}`"
+                )
+                if step_result.get("error"):
+                    st.caption(f"Error: {step_result['error']}")
         
         # Summary metrics
         col1, col2, col3, col4 = st.columns(4)
@@ -161,6 +250,16 @@ with tab4:
         col3.metric("✗ Failed", result.get("failed_steps", 0))
         col4.metric("Success Rate", 
                    f"{100 * result.get('successful_steps', 0) / max(1, result.get('total_steps', 1)):.0f}%")
+
+        # Map visualization for vector outputs.
+        st.subheader("Map Preview")
+        geojson_outputs = _extract_geojson_outputs(result)
+        if geojson_outputs:
+            selected_map_file = st.selectbox("Select output layer", geojson_outputs)
+            _render_geojson_map(selected_map_file)
+        else:
+            st.info("No GeoJSON outputs found for this run. Showing default map.")
+            _render_default_map()
         
         # Execution log
         st.subheader("Execution Log")

@@ -39,3 +39,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# python
+venv/
+.venv/
+venv_backup/
+__pycache__/
+*.py[cod]
+*.pyd
+*.egg-info/
+
+# local generated artifacts
+outputs/
+allfiles.txt
