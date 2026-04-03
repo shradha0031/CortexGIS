@@ -1,6 +1,7 @@
-workflow_id,test_case,execution_time_s,success_rate_pct,iou,f1_score
-flood_mapping_001,small_aoi,1650,100.0,0.9099999999999999,0.87
-flood_mapping_001,medium_aoi,1700,100.0,0.9199999999999999,0.87
-flood_mapping_001,large_aoi,1650,100.0,0.9099999999999999,0.87
-site_suitability_solar_001,flat_terrain,1980,100.0,,
-site_suitability_solar_001,mountainous,1940,100.0,,
+workflow_id,workflow_type,test_case,query,context,execution_time_seconds,memory_peak_mb,successful_steps,total_steps,success_rate_percent,artifacts_generated,reasoning_steps,errors_count,logical_validity_score,execution_reliability,error_resilience,error
+flood_plan_001,flood,flood_mandi,Detect flood risk in Mandi,"city:Mandi, Himachal Pradesh",0.004,0.038,4,4,100.0,4,5,0,1.0,1.0,1.0,
+flood_plan_001,flood,flood_pune,Detect flooded areas after heavy rainfall in Pune,city:Pune,0.004,0.022,4,4,100.0,4,5,0,1.0,1.0,1.0,
+flood_plan_001,flood,flood_bbox,Flood mapping for this AOI,"bbox:76.85,31.65,77.00,31.78",0.006,0.022,4,4,100.0,4,5,0,1.0,1.0,1.0,
+suitability_plan_001,suitability,solar_mandi,Find suitable locations for solar farms in Mandi,"city:Mandi, Himachal Pradesh",0.011,0.038,12,12,100.0,12,5,0,1.0,1.0,1.0,
+suitability_plan_001,suitability,solar_bengaluru,Site suitability analysis for solar parks around Bengaluru,city:Bengaluru,0.013,0.034,12,12,100.0,12,5,0,1.0,1.0,1.0,
+suitability_plan_001,suitability,site_bbox,Find suitable sites considering slope and roads,"bbox:77.45,12.85,77.75,13.15",0.012,0.031,12,12,100.0,12,5,0,1.0,1.0,1.0,

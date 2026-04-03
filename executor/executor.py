@@ -3,6 +3,7 @@ from typing import Dict, List, Any, Optional
 from executor.tool_base import GeoTool, ToolResult, ToolStatus
 from executor.tool_adapters import VectorTool, RasterTool, WhiteboxTool, SentinelTool
 import json
+import time
 
 
 class ToolRegistry:
@@ -62,6 +63,7 @@ class WorkflowExecutor:
         print(f"\n[Executor] Starting workflow: {workflow_id}")
         successful_steps = 0
         failed_steps = 0
+        workflow_start_time = time.perf_counter()
         
         for step in steps:
             step_id = step.get("id")
@@ -86,7 +88,11 @@ class WorkflowExecutor:
                 )
             else:
                 # Execute tool
+                step_start_time = time.perf_counter()
                 result = tool.execute(operation, resolved_params, output_dir=output_dir)
+                step_duration_ms = (time.perf_counter() - step_start_time) * 1000.0
+                result.metrics = result.metrics or {}
+                result.metrics["duration_ms"] = round(step_duration_ms, 2)
             
             # Store result
             self.step_outputs[step_id] = result
@@ -108,11 +114,22 @@ class WorkflowExecutor:
                 # For now, continue to next step
         
         # Compile summary
+        total_duration_ms = (time.perf_counter() - workflow_start_time) * 1000.0
+        total_duration_sec = round(total_duration_ms / 1000.0, 3)
+        successful_rate = (100.0 * successful_steps / max(1, len(steps)))
+
+        produced_output_files: List[str] = []
+        for entry in self.execution_log:
+            produced_output_files.extend(entry.get("result", {}).get("output_files", []))
+
         summary = {
             "workflow_id": workflow_id,
             "total_steps": len(steps),
             "successful_steps": successful_steps,
             "failed_steps": failed_steps,
+            "success_rate": round(successful_rate, 2),
+            "runtime_seconds": total_duration_sec,
+            "generated_output_files": produced_output_files,
             "execution_log": self.execution_log,
             "final_outputs": workflow.get("outputs", []),
         }

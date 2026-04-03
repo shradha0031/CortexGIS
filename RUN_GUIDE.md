@@ -275,6 +275,30 @@ Once running, read these files for more info:
 
 ---
 
+## 📦 **Final Deliverables Run (Submission)**
+
+Use this exact sequence to generate benchmark deliverables:
+
+```powershell
+cd C:\projects\cortexgis
+venv\Scripts\activate
+python scripts/validate_workflows.py
+$env:CORTEXGIS_USE_LOCAL_LLM='0'
+python scripts/demo_benchmarking.py
+```
+
+Expected output files:
+- `outputs/benchmark_report.json`
+- `outputs/benchmark_results.csv`
+
+Optional archive command:
+
+```powershell
+Compress-Archive -Path README.md,workflows\flood_mapping.json,workflows\site_suitability.json,outputs\benchmark_report.json,outputs\benchmark_results.csv -DestinationPath outputs\cortexgis_deliverables.zip -Force
+```
+
+---
+
 ## 🚀 **Next Steps**
 
 1. **Explore the UI** — Try different queries

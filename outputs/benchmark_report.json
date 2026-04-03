@@ -1,91 +1,189 @@
 {
   "metadata": {
-    "generated_at": "2026-03-02 04:28:04",
-    "num_benchmarks": 5
+    "generated_at": "2026-04-02 04:31:39",
+    "num_benchmarks": 6
   },
   "results": [
     {
-      "workflow_id": "flood_mapping_001",
-      "test_case": "small_aoi",
-      "execution_time_seconds": 1650,
-      "memory_peak_mb": 2048.0,
-      "successful_steps": 10,
-      "total_steps": 10,
+      "workflow_id": "flood_plan_001",
+      "workflow_type": "flood",
+      "test_case": "flood_mandi",
+      "query": "Detect flood risk in Mandi",
+      "context": "city:Mandi, Himachal Pradesh",
+      "execution_time_seconds": 0.004,
+      "memory_peak_mb": 0.038,
+      "successful_steps": 4,
+      "total_steps": 4,
       "success_rate_percent": 100.0,
+      "artifacts_generated": 4,
+      "reasoning_steps": 5,
+      "errors_count": 0,
+      "validation_errors": [],
       "accuracy_metrics": {
-        "iou": 0.9099999999999999,
-        "f1_score": 0.87,
-        "precision": 0.89,
-        "recall": 0.85
+        "logical_validity_score": 1.0,
+        "execution_reliability": 1.0,
+        "error_resilience": 1.0
       },
       "error": null
     },
     {
-      "workflow_id": "flood_mapping_001",
-      "test_case": "medium_aoi",
-      "execution_time_seconds": 1700,
-      "memory_peak_mb": 2048.0,
-      "successful_steps": 10,
-      "total_steps": 10,
+      "workflow_id": "flood_plan_001",
+      "workflow_type": "flood",
+      "test_case": "flood_pune",
+      "query": "Detect flooded areas after heavy rainfall in Pune",
+      "context": "city:Pune",
+      "execution_time_seconds": 0.004,
+      "memory_peak_mb": 0.022,
+      "successful_steps": 4,
+      "total_steps": 4,
       "success_rate_percent": 100.0,
+      "artifacts_generated": 4,
+      "reasoning_steps": 5,
+      "errors_count": 0,
+      "validation_errors": [],
       "accuracy_metrics": {
-        "iou": 0.9199999999999999,
-        "f1_score": 0.87,
-        "precision": 0.89,
-        "recall": 0.85
+        "logical_validity_score": 1.0,
+        "execution_reliability": 1.0,
+        "error_resilience": 1.0
       },
       "error": null
     },
     {
-      "workflow_id": "flood_mapping_001",
-      "test_case": "large_aoi",
-      "execution_time_seconds": 1650,
-      "memory_peak_mb": 2048.0,
-      "successful_steps": 10,
-      "total_steps": 10,
+      "workflow_id": "flood_plan_001",
+      "workflow_type": "flood",
+      "test_case": "flood_bbox",
+      "query": "Flood mapping for this AOI",
+      "context": "bbox:76.85,31.65,77.00,31.78",
+      "execution_time_seconds": 0.006,
+      "memory_peak_mb": 0.022,
+      "successful_steps": 4,
+      "total_steps": 4,
       "success_rate_percent": 100.0,
+      "artifacts_generated": 4,
+      "reasoning_steps": 5,
+      "errors_count": 0,
+      "validation_errors": [],
       "accuracy_metrics": {
-        "iou": 0.9099999999999999,
-        "f1_score": 0.87,
-        "precision": 0.89,
-        "recall": 0.85
+        "logical_validity_score": 1.0,
+        "execution_reliability": 1.0,
+        "error_resilience": 1.0
       },
       "error": null
     },
     {
-      "workflow_id": "site_suitability_solar_001",
-      "test_case": "flat_terrain",
-      "execution_time_seconds": 1980,
-      "memory_peak_mb": 2200.0,
-      "successful_steps": 14,
-      "total_steps": 14,
+      "workflow_id": "suitability_plan_001",
+      "workflow_type": "suitability",
+      "test_case": "solar_mandi",
+      "query": "Find suitable locations for solar farms in Mandi",
+      "context": "city:Mandi, Himachal Pradesh",
+      "execution_time_seconds": 0.011,
+      "memory_peak_mb": 0.038,
+      "successful_steps": 12,
+      "total_steps": 12,
       "success_rate_percent": 100.0,
+      "artifacts_generated": 12,
+      "reasoning_steps": 5,
+      "errors_count": 0,
+      "validation_errors": [],
       "accuracy_metrics": {
-        "area_correlation": 0.91,
-        "site_identification_rate": 0.88,
-        "false_positive_rate": 0.06
+        "logical_validity_score": 1.0,
+        "execution_reliability": 1.0,
+        "error_resilience": 1.0
       },
       "error": null
     },
     {
-      "workflow_id": "site_suitability_solar_001",
-      "test_case": "mountainous",
-      "execution_time_seconds": 1940,
-      "memory_peak_mb": 2200.0,
-      "successful_steps": 14,
-      "total_steps": 14,
+      "workflow_id": "suitability_plan_001",
+      "workflow_type": "suitability",
+      "test_case": "solar_bengaluru",
+      "query": "Site suitability analysis for solar parks around Bengaluru",
+      "context": "city:Bengaluru",
+      "execution_time_seconds": 0.013,
+      "memory_peak_mb": 0.034,
+      "successful_steps": 12,
+      "total_steps": 12,
       "success_rate_percent": 100.0,
+      "artifacts_generated": 12,
+      "reasoning_steps": 5,
+      "errors_count": 0,
+      "validation_errors": [],
       "accuracy_metrics": {
-        "area_correlation": 0.91,
-        "site_identification_rate": 0.88,
-        "false_positive_rate": 0.06
+        "logical_validity_score": 1.0,
+        "execution_reliability": 1.0,
+        "error_resilience": 1.0
+      },
+      "error": null
+    },
+    {
+      "workflow_id": "suitability_plan_001",
+      "workflow_type": "suitability",
+      "test_case": "site_bbox",
+      "query": "Find suitable sites considering slope and roads",
+      "context": "bbox:77.45,12.85,77.75,13.15",
+      "execution_time_seconds": 0.012,
+      "memory_peak_mb": 0.031,
+      "successful_steps": 12,
+      "total_steps": 12,
+      "success_rate_percent": 100.0,
+      "artifacts_generated": 12,
+      "reasoning_steps": 5,
+      "errors_count": 0,
+      "validation_errors": [],
+      "accuracy_metrics": {
+        "logical_validity_score": 1.0,
+        "execution_reliability": 1.0,
+        "error_resilience": 1.0
       },
       "error": null
     }
   ],
   "summary": {
-    "avg_execution_time_seconds": 1784.0,
+    "avg_execution_time_seconds": 0.0083,
     "avg_success_rate_percent": 100.0,
-    "total_memory_mb": 10544.0
+    "avg_memory_peak_mb": 0.0308,
+    "total_artifacts_generated": 48,
+    "total_errors": 0
+  },
+  "summary_by_workflow_type": {
+    "flood": {
+      "count": 3,
+      "avg_runtime_seconds": 0.0047,
+      "avg_success_rate_percent": 100.0,
+      "avg_memory_peak_mb": 0.0273,
+      "avg_logical_validity": 1.0,
+      "avg_error_resilience": 1.0
+    },
+    "suitability": {
+      "count": 3,
+      "avg_runtime_seconds": 0.012,
+      "avg_success_rate_percent": 100.0,
+      "avg_memory_peak_mb": 0.0343,
+      "avg_logical_validity": 1.0,
+      "avg_error_resilience": 1.0
+    }
+  },
+  "manual_baseline_comparison": {
+    "flood": {
+      "baseline_runtime_seconds": 1800.0,
+      "automated_avg_runtime_seconds": 0.0047,
+      "time_speedup_x": 385714.2857,
+      "baseline_success_rate_percent": 92.0,
+      "automated_success_rate_percent": 100.0,
+      "success_rate_delta_percent": 8.0,
+      "baseline_errors_count": 1.0,
+      "automated_avg_errors_count": 0,
+      "error_reduction": 1.0
+    },
+    "suitability": {
+      "baseline_runtime_seconds": 2400.0,
+      "automated_avg_runtime_seconds": 0.012,
+      "time_speedup_x": 200000.0,
+      "baseline_success_rate_percent": 88.0,
+      "automated_success_rate_percent": 100.0,
+      "success_rate_delta_percent": 12.0,
+      "baseline_errors_count": 2.0,
+      "automated_avg_errors_count": 0,
+      "error_reduction": 2.0
+    }
   }
 }

@@ -284,26 +284,53 @@ Parameters prefixed with `$step_N.outputs` are automatically resolved by the exe
 
 ## 📈 Benchmarking Results
 
-**Recent run (5 benchmark cases):**
+Run the executable benchmark suite:
 
-| Workflow | Test Case | Time | Success | Accuracy |
-|----------|-----------|------|---------|----------|
-| Flood | Small AOI (100 km²) | 1650s | 100% | IoU 0.910 |
-| Flood | Medium AOI (500 km²) | 1700s | 100% | IoU 0.920 |
-| Flood | Large AOI (2000 km²) | 1650s | 100% | IoU 0.910 |
-| Suitability | Flat terrain | 1980s | 100% | Corr 0.910 |
-| Suitability | Mountainous | 1940s | 100% | Corr 0.910 |
+```bash
+# deterministic benchmark run (stub planner mode)
+set CORTEXGIS_USE_LOCAL_LLM=0
+python scripts/demo_benchmarking.py
+```
 
-**Summary:**
-- **Avg Execution Time:** 1784s (~30 min)
-- **Avg Success Rate:** 100%
-- **Speedup vs. Manual:** 4.4x faster
-- **Accuracy vs. Baseline:** +16% improvement (IoU)
-- **Memory:** 10.5 GB total across all runs
-- **Reproducibility:** Deterministic (same inputs → same outputs)
-- **Scalability:** Linear with AOI size
+Current benchmark set includes 6 cases:
+- 3 flood cases (`flood_mandi`, `flood_pune`, `flood_bbox`)
+- 3 site-suitability cases (`solar_mandi`, `solar_bengaluru`, `site_bbox`)
 
-Reports saved to `outputs/benchmark_report.json` and `outputs/benchmark_results.csv`.
+Example summary from a recent run:
+- Avg Runtime: ~0.0075s (stub execution mode)
+- Avg Success Rate: 100%
+- Total Artifacts: 48
+- Total Errors: 0
+
+Manual baseline comparison is included per workflow type in report output:
+- `time_speedup_x`
+- `success_rate_delta_percent`
+- `error_reduction`
+
+Generated artifacts:
+- `outputs/benchmark_report.json`
+- `outputs/benchmark_results.csv`
+
+Note: Runtime values are very small in stub mode. Real data/API integration will produce realistic processing times.
+
+---
+
+## 📦 Deliverables Packaging
+
+Generate and verify the final submission artifacts:
+
+```bash
+python scripts/validate_workflows.py
+set CORTEXGIS_USE_LOCAL_LLM=0
+python scripts/demo_benchmarking.py
+```
+
+Submission-ready files:
+- `outputs/benchmark_report.json`
+- `outputs/benchmark_results.csv`
+- `workflows/flood_mapping.json`
+- `workflows/site_suitability.json`
+- `README.md`
 
 ---
 

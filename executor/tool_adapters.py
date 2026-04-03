@@ -151,6 +151,28 @@ class VectorTool(GeoTool):
                     logs=logs,
                 )
 
+            elif operation == "load_osm":
+                feature_type = params.get("feature_type", "roads")
+                center_lat = float(params.get("center_lat", 18.5204))
+                center_lon = float(params.get("center_lon", 73.8567))
+                output_file = _build_output_path(output_dir, f"osm_{feature_type}.geojson")
+                logs.append(f"Loading OSM {feature_type} layer")
+                _write_sample_geojson(
+                    output_file,
+                    feature_name=feature_type,
+                    center_lat=center_lat,
+                    center_lon=center_lon,
+                    size_deg=0.03,
+                )
+                return ToolResult(
+                    tool_name=self.name,
+                    operation=operation,
+                    status=ToolStatus.SUCCESS,
+                    output_files=[output_file],
+                    metrics={"feature_type": feature_type, "source": "OpenStreetMap"},
+                    logs=logs,
+                )
+
             else:
                 return ToolResult(
                     tool_name=self.name,
@@ -179,6 +201,7 @@ class VectorTool(GeoTool):
             "raster_to_vector",
             "raster_to_poly",
             "validate",
+            "load_osm",
         ]
 
 
@@ -289,6 +312,62 @@ class RasterTool(GeoTool):
                     logs=logs,
                 )
 
+            elif operation == "slope":
+                output_file = _build_output_path(output_dir, "slope.tif")
+                logs.append("Computing slope from DEM")
+                _write_placeholder_file(output_file, "stub slope raster")
+                return ToolResult(
+                    tool_name=self.name,
+                    operation=operation,
+                    status=ToolStatus.SUCCESS,
+                    output_files=[output_file],
+                    metrics={"method": "gdal_dem"},
+                    logs=logs,
+                )
+
+            elif operation == "combine":
+                method = params.get("method", "intersection")
+                output_file = _build_output_path(output_dir, f"combined_{method}.tif")
+                logs.append(f"Combining constraint layers via {method}")
+                _write_placeholder_file(output_file, "stub combined constraint raster")
+                return ToolResult(
+                    tool_name=self.name,
+                    operation=operation,
+                    status=ToolStatus.SUCCESS,
+                    output_files=[output_file],
+                    metrics={"method": method},
+                    logs=logs,
+                )
+
+            elif operation == "rank":
+                scale = params.get("scale", 100)
+                output_file = _build_output_path(output_dir, "ranked_suitability.tif")
+                logs.append(f"Ranking suitability scores on 0-{scale} scale")
+                _write_placeholder_file(output_file, "stub ranked suitability raster")
+                return ToolResult(
+                    tool_name=self.name,
+                    operation=operation,
+                    status=ToolStatus.SUCCESS,
+                    output_files=[output_file],
+                    metrics={"scale": scale},
+                    logs=logs,
+                )
+
+            elif operation == "cluster":
+                min_size = params.get("min_size", 10)
+                output_file = _build_output_path(output_dir, "clusters.tif")
+                logs.append(f"Clustering suitable areas (min size: {min_size} pixels)")
+                _write_placeholder_file(output_file, "stub clustered regions raster")
+                return ToolResult(
+                    tool_name=self.name,
+                    operation=operation,
+                    status=ToolStatus.SUCCESS,
+                    output_files=[output_file],
+                    metrics={"min_cluster_size": min_size, "clusters_found": 5},
+                    logs=logs,
+                )
+
+
             else:
                 return ToolResult(
                     tool_name=self.name,
@@ -318,6 +397,10 @@ class RasterTool(GeoTool):
             "to_db",
             "morphological_close",
             "stats",
+            "slope",
+            "combine",
+            "rank",
+            "cluster",
         ]
 
 
@@ -344,6 +427,32 @@ class SentinelTool(GeoTool):
                 logs=logs,
             )
 
+        elif operation == "download_landcover":
+            output_file = _build_output_path(output_dir, "landcover.tif")
+            logs.append("Fetching landcover classification layer")
+            _write_placeholder_file(output_file, "stub landcover raster")
+            return ToolResult(
+                tool_name=self.name,
+                operation=operation,
+                status=ToolStatus.SUCCESS,
+                output_files=[output_file],
+                metrics={"source": "copernicus_lulc"},
+                logs=logs,
+            )
+
+        elif operation == "download_dem":
+            output_file = _build_output_path(output_dir, "dem.tif")
+            logs.append("Fetching DEM (Digital Elevation Model)")
+            _write_placeholder_file(output_file, "stub DEM raster")
+            return ToolResult(
+                tool_name=self.name,
+                operation=operation,
+                status=ToolStatus.SUCCESS,
+                output_files=[output_file],
+                metrics={"source": "SRTM_90m"},
+                logs=logs,
+            )
+
         return ToolResult(
             tool_name=self.name,
             operation=operation,
@@ -353,7 +462,7 @@ class SentinelTool(GeoTool):
         )
 
     def supported_operations(self) -> List[str]:
-        return ["download_vv", "download_sar"]
+        return ["download_vv", "download_sar", "download_landcover", "download_dem"]
 
 
 class WhiteboxTool(GeoTool):

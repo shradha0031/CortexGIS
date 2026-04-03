@@ -1,130 +1,87 @@
-"""Demo: run benchmarks on example workflows."""
-import sys
+﻿"""Demo: run executable benchmarks for planner + executor."""
 import os
-import json
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from evaluation.benchmark import BenchmarkSuite, BenchmarkResult, MetricsComputer, FLOOD_BENCHMARKS, SITE_SUITABILITY_BENCHMARKS
+from evaluation.benchmark import (
+    BenchmarkSuite,
+    FLOOD_BENCHMARKS,
+    SITE_SUITABILITY_BENCHMARKS,
+    MANUAL_BASELINES,
+)
+from planner.geospatial_planner import GeospatialPlanner
+from planner.local_llm_client import build_local_llm_client_from_env
+from executor.executor import ToolRegistry, WorkflowExecutor
+
+
+def _run_cases(suite: BenchmarkSuite, planner: GeospatialPlanner, workflow_type: str, test_cases):
+    print(f"\n[{workflow_type.upper()}] Running {len(test_cases)} benchmark cases")
+    print("-" * 72)
+    for case in test_cases:
+        print(f"Case: {case['name']} | Query: {case['query']}")
+        executor = WorkflowExecutor(ToolRegistry())
+        result = suite.run_benchmark(
+            planner=planner,
+            executor=executor,
+            workflow_type=workflow_type,
+            test_case=case,
+            output_dir="./outputs",
+        )
+        print(
+            f"  -> id={result.workflow_id}, steps={result.successful_steps}/{result.total_steps}, "
+            f"runtime={result.execution_time_seconds:.3f}s, artifacts={result.artifacts_generated}, "
+            f"errors={result.errors_count}"
+        )
 
 
 def main():
-    print("=" * 70)
-    print("CortexGIS Workflow Benchmarking Demo")
-    print("=" * 70)
-    
-    # Load example workflows
-    with open("workflows/flood_mapping.json") as f:
-        flood_workflow = json.load(f)
-    
-    with open("workflows/site_suitability.json") as f:
-        site_workflow = json.load(f)
-    
-    # Initialize benchmark suite
+    os.makedirs("outputs", exist_ok=True)
+
+    print("=" * 72)
+    print("CortexGIS Benchmark Runner")
+    print("=" * 72)
+
+    llm_client = build_local_llm_client_from_env()
+    planner = GeospatialPlanner(llm_client=llm_client)
+
+    print("Planner backend:", llm_client.describe() if llm_client else "stub")
+
     suite = BenchmarkSuite()
-    
-    # Simulate flood mapping benchmarks
-    print("\n[1] Flood Mapping Benchmarks")
-    print("-" * 70)
-    
-    for test_case in FLOOD_BENCHMARKS:
-        print(f"\n  Running: {test_case['name']}")
-        print(f"  {test_case['description']}")
-        
-        # Stub: would actually execute workflow
-        result = BenchmarkResult(
-            workflow_id=flood_workflow["id"],
-            test_case=test_case["name"],
-            execution_time_seconds=1200 + len(test_case["name"]) * 50,  # Deterministic stub
-            memory_peak_mb=2048.0,
-            successful_steps=10,
-            total_steps=10,
-            accuracy_metrics={
-                "iou": 0.82 + len(test_case["name"]) * 0.01,
-                "f1_score": 0.87,
-                "precision": 0.89,
-                "recall": 0.85,
-            }
-        )
-        
-        suite.results.append(result)
-        print(f"    Time: {result.execution_time_seconds:.1f}s | Success: {result.success_rate():.0f}% | IoU: {result.accuracy_metrics['iou']:.3f}")
-    
-    # Simulate site suitability benchmarks
-    print("\n[2] Site Suitability Benchmarks")
-    print("-" * 70)
-    
-    for test_case in SITE_SUITABILITY_BENCHMARKS:
-        print(f"\n  Running: {test_case['name']}")
-        print(f"  {test_case['description']}")
-        
-        # Stub: would actually execute workflow
-        result = BenchmarkResult(
-            workflow_id=site_workflow["id"],
-            test_case=test_case["name"],
-            execution_time_seconds=1500 + len(test_case["name"]) * 40,
-            memory_peak_mb=2200.0,
-            successful_steps=14,
-            total_steps=14,
-            accuracy_metrics={
-                "area_correlation": 0.91,
-                "site_identification_rate": 0.88,
-                "false_positive_rate": 0.06,
-            }
-        )
-        
-        suite.results.append(result)
-        print(f"    Time: {result.execution_time_seconds:.1f}s | Success: {result.success_rate():.0f}% | Area Correlation: {result.accuracy_metrics['area_correlation']:.3f}")
-    
-    # Generate report
-    print("\n" + "=" * 70)
-    print("Benchmark Summary")
-    print("=" * 70)
-    
-    report = suite.generate_report("outputs/benchmark_report.json")
-    
-    # Print summary
-    summary = report["summary"]
-    print(f"\nTotal Benchmarks Executed: {report['metadata']['num_benchmarks']}")
-    print(f"Avg Execution Time: {summary['avg_execution_time_seconds']:.1f} seconds")
-    print(f"Avg Success Rate: {summary['avg_success_rate_percent']:.1f}%")
-    print(f"Total Memory Used: {summary['total_memory_mb']:.0f} MB")
-    
-    # Export to CSV
+
+    _run_cases(suite, planner, "flood", FLOOD_BENCHMARKS)
+    _run_cases(suite, planner, "suitability", SITE_SUITABILITY_BENCHMARKS)
+
+    report = suite.generate_report("outputs/benchmark_report.json", baselines=MANUAL_BASELINES)
     suite.export_csv("outputs/benchmark_results.csv")
-    
-    print(f"\nReports saved:")
-    print(f"  - outputs/benchmark_report.json")
-    print(f"  - outputs/benchmark_results.csv")
-    
-    # Comparison with baseline (stub)
-    print("\n" + "=" * 70)
-    print("Comparison vs. Manual Baseline")
-    print("=" * 70)
-    
-    baseline = BenchmarkResult(
-        workflow_id="manual_baseline",
-        test_case="reference",
-        execution_time_seconds=7200,  # Manual approach takes 2 hours
-        memory_peak_mb=1024,
-        successful_steps=1,
-        total_steps=1,
-        accuracy_metrics={"iou": 0.75, "f1_score": 0.80}
-    )
-    
-    latest_flood = suite.results[0]
-    speedup = baseline.execution_time_seconds / latest_flood.execution_time_seconds
-    accuracy_gain = (latest_flood.accuracy_metrics["iou"] - baseline.accuracy_metrics["iou"]) * 100
-    
-    print(f"\nAutomated vs. Manual:")
-    print(f"  Time Speedup: {speedup:.1f}x faster")
-    print(f"  Accuracy Improvement: +{accuracy_gain:.1f}% (IoU)")
-    print(f"  Reproducibility: High (deterministic)")
-    print(f"  Scalability: Linear (processing time ∝ AOI size)")
-    
-    print("\n" + "=" * 70)
+
+    summary = report["summary"]
+    print("\n" + "=" * 72)
+    print("Summary")
+    print("=" * 72)
+    print("Benchmarks:", report["metadata"]["num_benchmarks"])
+    print("Avg Runtime (s):", summary["avg_execution_time_seconds"])
+    print("Avg Success Rate (%):", summary["avg_success_rate_percent"])
+    print("Avg Peak Memory (MB):", summary["avg_memory_peak_mb"])
+    print("Total Artifacts:", summary["total_artifacts_generated"])
+    print("Total Errors:", summary["total_errors"])
+
+    baseline_cmp = report.get("manual_baseline_comparison", {})
+    if baseline_cmp:
+        print("\n" + "=" * 72)
+        print("Manual Baseline Comparison")
+        print("=" * 72)
+        for workflow_type, cmp in baseline_cmp.items():
+            print(f"[{workflow_type}] speedup={cmp['time_speedup_x']}x, ")
+            print(
+                f"  success_delta={cmp['success_rate_delta_percent']}%, "
+                f"error_reduction={cmp['error_reduction']}"
+            )
+
+    print("\nSaved:")
+    print("- outputs/benchmark_report.json")
+    print("- outputs/benchmark_results.csv")
 
 
 if __name__ == "__main__":
-    os.makedirs("outputs", exist_ok=True)
     main()
