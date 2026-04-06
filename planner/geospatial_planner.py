@@ -17,12 +17,21 @@ class GeospatialPlanner:
         """
         Args:
             llm_client: An LLM client (e.g., OpenAI, local, etc.) with a generate() method.
-            rag_retriever: A RAG retriever for context (optional).
+            rag_retriever: A RAG retriever for context (optional). If None, creates one automatically.
         """
         self.llm_client = llm_client
-        self.rag_retriever = rag_retriever
         self.reasoning_history: List[Dict] = []
         self._geocode_cache: Dict[str, Tuple[float, float]] = {}
+        
+        # Initialize RAG retriever if not provided
+        if rag_retriever is None:
+            try:
+                from rag.rag_retriever import GeoRAGRetriever
+                self.rag_retriever = GeoRAGRetriever()
+            except ImportError:
+                self.rag_retriever = None
+        else:
+            self.rag_retriever = rag_retriever
 
     def plan_workflow(self, query: str, context: Optional[str] = None) -> Tuple[List[str], Dict]:
         """
@@ -36,9 +45,12 @@ class GeospatialPlanner:
             (cot_reasoning, workflow_json)
         """
         # Step 1: Retrieve relevant docs if RAG is available
-        retrieved_docs = []
+        rag_context = ""
         if self.rag_retriever:
-            retrieved_docs = self.rag_retriever.retrieve(query, top_k=3)
+            try:
+                rag_context = self.rag_retriever.get_context_for_planning(query)
+            except Exception as e:
+                print(f"Warning: RAG retrieval failed: {e}")
         
         # Step 2: Formulate the reasoning prompt
         from prompts.system_prompts import SYSTEM_PROMPT, WORKFLOW_GENERATION_PROMPT
@@ -50,7 +62,7 @@ User Query: {query}
 
 {'Context: ' + context if context else ''}
 
-{'Retrieved Background:' + ''.join([doc[0][:500] for _, doc in enumerate(retrieved_docs)]) if retrieved_docs else ''}
+{'Retrieved Examples and Tools:\n' + rag_context if rag_context else ''}
 
 Now, reason through this problem step-by-step:
 """
@@ -69,14 +81,14 @@ Now, reason through this problem step-by-step:
         
         # Step 4: Generate workflow JSON
         workflow_gen_prompt = f"""
-    {reasoning_prompt}
+{reasoning_prompt}
 
-    {WORKFLOW_GENERATION_PROMPT}
+{WORKFLOW_GENERATION_PROMPT}
 
-    Return ONLY a valid JSON object. Do not add markdown fences.
-    Ensure each step has: id, tool, op, params.
-    Use tools from this set: sentinel, raster, vector, whitebox.
-    """
+Return ONLY a valid JSON object. Do not add markdown fences.
+Ensure each step has: id, tool, op, params.
+Use tools from this set: sentinel, raster, vector, whitebox.
+"""
         
         if self.llm_client is None:
             workflow_json = self._stub_workflow(query, context=context)
@@ -97,6 +109,7 @@ Now, reason through this problem step-by-step:
             "query": query,
             "reasoning": cot_reasoning,
             "workflow": workflow_json,
+            "rag_context": rag_context,
         })
         
         return cot_reasoning, workflow_json

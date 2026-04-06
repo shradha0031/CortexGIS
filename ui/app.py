@@ -1,10 +1,10 @@
 """Streamlit UI for CortexGIS."""
 import streamlit as st
+import streamlit.components.v1 as components
 import json
 import sys
 import os
 from pathlib import Path
-import pydeck as pdk
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -86,65 +86,147 @@ def _extract_geojson_outputs(result: dict) -> list[str]:
     return list(dict.fromkeys(output_paths))
 
 
-def _render_geojson_map(file_path: str, center_override=None, zoom_override=None):
-    """Render a GeoJSON file on an interactive map."""
-    with open(file_path, "r", encoding="utf-8") as f:
-        geojson_data = json.load(f)
+def _render_leaflet_map(
+        center_lat: float,
+        center_lon: float,
+        zoom: int,
+        geojson_data=None,
+        basemap: str = "Road",
+):
+        """Render a real tile basemap with an optional GeoJSON overlay."""
+        tile_layers = {
+                "Road": {
+                        "url": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                        "name": "OpenStreetMap",
+                        "attribution": "&copy; OpenStreetMap contributors",
+                },
+                "Satellite": {
+                        "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                        "name": "Esri World Imagery",
+                        "attribution": "Tiles &copy; Esri",
+                },
+        }
+        tile = tile_layers.get(basemap, tile_layers["Road"])
+        geojson_json = json.dumps(geojson_data) if geojson_data is not None else "null"
+        map_html = f"""
+        <!doctype html>
+        <html>
+        <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <style>
+                html, body {{
+                    margin: 0;
+                    padding: 0;
+                    width: 100%;
+                    height: 100%;
+                }}
+                #map {{
+                    width: 100%;
+                    height: 100%;
+                    min-height: 520px;
+                    border-radius: 16px;
+                    overflow: hidden;
+                }}
+                .basemap-badge {{
+                    position: absolute;
+                    z-index: 1000;
+                    top: 12px;
+                    left: 12px;
+                    background: rgba(16, 24, 40, 0.86);
+                    color: #fff;
+                    padding: 8px 10px;
+                    border-radius: 999px;
+                    font: 600 12px/1.2 Arial, sans-serif;
+                    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+                }}
+            </style>
+        </head>
+        <body>
+            <div id="map"></div>
+            <div class="basemap-badge">Basemap: {tile['name']}</div>
+            <script>
+                const map = L.map('map', {{ zoomControl: true, scrollWheelZoom: false }}).setView([{center_lat}, {center_lon}], {zoom});
+                L.tileLayer('{tile['url']}', {{
+                    attribution: '{tile['attribution']}',
+                    maxZoom: 19,
+                }}).addTo(map);
 
-    features = geojson_data.get("features", []) if isinstance(geojson_data, dict) else []
-    if not features:
-        st.warning(f"No features to display in map file: {file_path}")
-        return
+                const geojsonData = {geojson_json};
+                if (geojsonData) {{
+                    const layer = L.geoJSON(geojsonData, {{
+                        style: function () {{
+                            return {{ color: '#0ea5e9', weight: 3, fillColor: '#38bdf8', fillOpacity: 0.25 }};
+                        }},
+                        pointToLayer: function (feature, latlng) {{
+                            return L.circleMarker(latlng, {{ radius: 6, color: '#0f172a', weight: 2, fillColor: '#38bdf8', fillOpacity: 0.95 }});
+                        }},
+                        onEachFeature: function (feature, layer) {{
+                            if (feature.properties) {{
+                                const props = Object.entries(feature.properties)
+                                    .map(([key, value]) => `${{key}}: ${{value}}`)
+                                    .join('<br>');
+                                if (props) layer.bindPopup(props);
+                            }}
+                        }}
+                    }}).addTo(map);
 
-    # Compute a simple map center from the first coordinate in first feature.
-    center_lat = 18.52
-    center_lon = 73.84
-    try:
-        geometry = features[0].get("geometry", {})
-        geom_type = geometry.get("type")
-        coords = geometry.get("coordinates", [])
-        if geom_type == "Point":
-            center_lon, center_lat = coords
-        elif geom_type == "Polygon":
-            center_lon, center_lat = coords[0][0]
-        elif geom_type == "MultiPolygon":
-            center_lon, center_lat = coords[0][0][0]
-    except Exception:
-        pass
-
-    if center_override is not None:
-        center_lat, center_lon = center_override
-
-    layer = pdk.Layer(
-        "GeoJsonLayer",
-        geojson_data,
-        pickable=True,
-        stroked=True,
-        filled=True,
-        get_fill_color=[0, 120, 255, 90],
-        get_line_color=[0, 180, 255, 220],
-        line_width_min_pixels=2,
-    )
-
-    view_state = pdk.ViewState(
-        latitude=center_lat,
-        longitude=center_lon,
-        zoom=zoom_override if zoom_override is not None else 10,
-    )
-    deck = pdk.Deck(layers=[layer], initial_view_state=view_state, tooltip={"text": "{name}"})
-    st.pydeck_chart(deck, use_container_width=True)
+                    const bounds = layer.getBounds();
+                    if (bounds.isValid()) {{
+                        map.fitBounds(bounds.pad(0.15));
+                    }}
+                }}
+            </script>
+        </body>
+        </html>
+        """
+        components.html(map_html, height=560, scrolling=False)
 
 
-def _render_default_map(center_lat: float = 18.5204, center_lon: float = 73.8567, zoom: int = 9):
-    """Always provide a map canvas even when no vector artifact exists yet."""
-    st.caption("Default map view (no GeoJSON layer generated for this run).")
-    st.map(
-        [
-            {"lat": center_lat, "lon": center_lon},
-        ],
-        zoom=zoom,
-        use_container_width=True,
-    )
+def _render_geojson_map(file_path: str, center_override=None, zoom_override=None, basemap: str = "Road"):
+        """Render a GeoJSON file on an interactive map."""
+        with open(file_path, "r", encoding="utf-8") as f:
+                geojson_data = json.load(f)
+
+        features = geojson_data.get("features", []) if isinstance(geojson_data, dict) else []
+        if not features:
+                st.warning(f"No features to display in map file: {file_path}")
+                return
+
+        # Compute a simple map center from the first coordinate in first feature.
+        center_lat = 18.52
+        center_lon = 73.84
+        try:
+                geometry = features[0].get("geometry", {})
+                geom_type = geometry.get("type")
+                coords = geometry.get("coordinates", [])
+                if geom_type == "Point":
+                        center_lon, center_lat = coords
+                elif geom_type == "Polygon":
+                        center_lon, center_lat = coords[0][0]
+                elif geom_type == "MultiPolygon":
+                        center_lon, center_lat = coords[0][0][0]
+        except Exception:
+                pass
+
+        if center_override is not None:
+                center_lat, center_lon = center_override
+
+        _render_leaflet_map(
+                center_lat=center_lat,
+                center_lon=center_lon,
+                zoom=zoom_override if zoom_override is not None else 10,
+                geojson_data=geojson_data,
+                basemap=basemap,
+        )
+
+
+def _render_default_map(center_lat: float = 18.5204, center_lon: float = 73.8567, zoom: int = 9, basemap: str = "Road"):
+        """Always provide a map canvas even when no vector artifact exists yet."""
+        st.caption("Default map view (no GeoJSON layer generated for this run).")
+        _render_leaflet_map(center_lat, center_lon, zoom, geojson_data=None, basemap=basemap)
 
 
 # Page config
@@ -327,6 +409,28 @@ with tab3:
                     output_dir="./outputs"
                 )
                 st.session_state.execution_result = result
+                
+                # Index the executed workflow for RAG learning
+                try:
+                    from rag.workflow_indexer import WorkflowIndexer
+                    indexer = WorkflowIndexer(rag_retriever=st.session_state.planner.rag_retriever)
+                    
+                    # Get reasoning from planner history
+                    reasoning = []
+                    if st.session_state.planner.reasoning_history:
+                        last_entry = st.session_state.planner.reasoning_history[-1]
+                        reasoning = last_entry.get("reasoning", [])
+                    
+                    # Index the workflow
+                    indexer.index_workflow(
+                        workflow=st.session_state.workflow,
+                        execution_result=result,
+                        query=st.session_state.workflow.get("description", ""),
+                        reasoning=reasoning,
+                    )
+                except Exception as e:
+                    st.caption(f"ℹ️ Note: Could not index workflow: {e}")
+            
             st.success("✓ Execution complete! Check the 'Results' tab.")
     else:
         st.warning("⚠️ No workflow to execute. Generate one first.")
@@ -375,6 +479,7 @@ with tab4:
         # Map visualization for vector outputs.
         st.subheader("Map Preview")
         view_lat, view_lon, view_zoom = _view_from_workflow(st.session_state.workflow)
+        basemap_choice = st.selectbox("Basemap style", ["Road", "Satellite"], index=0)
         geojson_outputs = _extract_geojson_outputs(result)
         if geojson_outputs:
             selected_map_file = st.selectbox("Select output layer", geojson_outputs)
@@ -382,10 +487,11 @@ with tab4:
                 selected_map_file,
                 center_override=(view_lat, view_lon),
                 zoom_override=view_zoom,
+                basemap=basemap_choice,
             )
         else:
             st.info("No GeoJSON outputs found for this run. Showing default map.")
-            _render_default_map(view_lat, view_lon, view_zoom)
+            _render_default_map(view_lat, view_lon, view_zoom, basemap=basemap_choice)
         
         # Execution log
         st.subheader("Execution Log")
